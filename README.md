@@ -134,88 +134,7 @@ auto* kernel = factory.create(kernel_name, source, "template_kernel.cu", {});
 
 ## CMake Integration
 
-### Method 1: Header-Only Integration
-
-Add gpulite as an include directory to your project:
-
-```cmake
-# CMakeLists.txt
-cmake_minimum_required(VERSION 3.12)
-project(MyProject LANGUAGES CXX)
-
-set(CMAKE_CXX_STANDARD 17)
-
-# Your executable
-add_executable(my_app main.cpp)
-
-# Add gpulite headers
-target_include_directories(my_app PRIVATE external/gpulite)
-
-target_link_libraries(my_app PRIVATE gpulite)
-
-# Link system libraries required by gpulite
-target_link_libraries(my_app PRIVATE ${CMAKE_DL_LIBS})
-```
-
-Create a simple CMakeLists.txt in the gpulite directory:
-
-```cmake
-# gpulite/CMakeLists.txt
-cmake_minimum_required(VERSION 3.12)
-project(gpulite LANGUAGES CXX)
-
-# Create header-only interface library
-add_library(gpulite INTERFACE)
-
-# Include directories
-target_include_directories(gpulite INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-    $<INSTALL_INTERFACE:include>
-)
-
-# C++17 requirement
-target_compile_features(gpulite INTERFACE cxx_std_17)
-
-# System dependencies
-find_package(Threads REQUIRED)
-target_link_libraries(gpulite INTERFACE 
-    ${CMAKE_DL_LIBS}
-    Threads::Threads
-)
-
-# Installation rules
-install(TARGETS gpulite EXPORT gpuliteConfig)
-install(FILES gpulite/gpulite.hpp DESTINATION include/gpulite)
-install(EXPORT gpuliteConfig DESTINATION lib/cmake/gpulite)
-```
-
-### Method 2: Manual Integration
-
-Simply copy the header files to your project and include them:
-
-```cmake
-# CMakeLists.txt
-cmake_minimum_required(VERSION 3.12)
-project(MyProject LANGUAGES CXX)
-
-set(CMAKE_CXX_STANDARD 17)
-
-# Your executable
-add_executable(my_app 
-    main.cpp
-    # Copy this header to your project
-    gpulite/gpulite.hpp
-)
-
-# Link required system libraries
-if(WIN32)
-    # Windows doesn't need explicit dynamic loading libraries
-else()
-    target_link_libraries(my_app PRIVATE ${CMAKE_DL_LIBS})
-endif()
-```
-
-### Method 3: Using FetchContent (Recommended)
+### Method 1: Using FetchContent (Recommended)
 
 ```cmake
 cmake_minimum_required(VERSION 3.14)
@@ -239,6 +158,38 @@ This is the recommended approach because:
 - Dependencies (`${CMAKE_DL_LIBS}`, `Threads`) are automatically linked
 - Include paths are automatically configured
 - Use a specific tag (e.g., `v1.0.0`) for reproducible builds
+
+### Method 2: Using add_subdirectory
+
+Clone or copy the gpulite repo to `external/gpulite`, then:
+
+```cmake
+cmake_minimum_required(VERSION 3.12)
+project(MyProject LANGUAGES CXX)
+
+add_subdirectory(external/gpulite)
+
+add_executable(my_app main.cpp)
+target_link_libraries(my_app PRIVATE gpulite)
+```
+
+### Method 3: Manual Header Copy
+
+Copy `gpulite/gpulite.hpp` to your project and link dependencies manually:
+
+```cmake
+cmake_minimum_required(VERSION 3.12)
+project(MyProject LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+
+add_executable(my_app main.cpp)
+target_include_directories(my_app PRIVATE path/to/gpulite)
+
+if(NOT WIN32)
+    target_link_libraries(my_app PRIVATE ${CMAKE_DL_LIBS})
+endif()
+```
 
 ## Advanced Usage
 
