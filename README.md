@@ -225,7 +225,7 @@ include(FetchContent)
 
 FetchContent_Declare(
     gpulite
-    GIT_REPOSITORY https://github.com/nickjbrowning/gpulite.git
+    GIT_REPOSITORY https://github.com/rubber-duck-debug/gpu-lite.git
     GIT_TAG v1.0.0
 )
 
