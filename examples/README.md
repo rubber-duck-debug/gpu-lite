@@ -1,6 +1,6 @@
-# gpu-lite Examples
+# gpulite Examples
 
-This directory contains comprehensive examples demonstrating how to use gpu-lite for runtime CUDA compilation and kernel caching.
+This directory contains comprehensive examples demonstrating how to use gpulite for runtime CUDA compilation and kernel caching.
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ This directory contains comprehensive examples demonstrating how to use gpu-lite
 ## Examples Overview
 
 ### 1. Basic Vector Addition (`basic_vector_add/`)
-- **Purpose**: Simple introduction to gpu-lite
+- **Purpose**: Simple introduction to gpulite
 - **Features**: Vector addition kernel, performance measurement
 - **Concepts**: Basic kernel compilation, memory management, error handling
 
@@ -49,7 +49,7 @@ make
 
 ### Method 2: Build All Examples
 
-From the main gpu-lite directory:
+From the main gpulite directory:
 
 ```bash
 # Create a main CMakeLists.txt for all examples
@@ -75,11 +75,11 @@ g++ -std=c++17 -I../.. vector_add.cpp -ldl -o vector_add
 
 ## Master CMakeLists.txt
 
-Create this file in the main gpu-lite directory to build all examples:
+Create this file in the main gpulite directory to build all examples:
 
 ```cmake
 cmake_minimum_required(VERSION 3.12)
-project(gpu-lite_Examples LANGUAGES CXX)
+project(gpulite_Examples LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -256,9 +256,9 @@ auto* kernel = KernelFactory::instance().create(
 
 ## Integration with Existing Projects
 
-To integrate gpu-lite examples into your project:
+To integrate gpulite examples into your project:
 
-1. Copy the gpu-lite headers to your project
+1. Copy the gpulite headers to your project
 2. Add the example code patterns to your application
 3. Link with `-ldl` for dynamic loading
 4. No CUDA SDK installation required!
@@ -269,4 +269,4 @@ target_include_directories(your_app PRIVATE path/to/gpulite/headers)
 target_link_libraries(your_app PRIVATE ${CMAKE_DL_LIBS})
 ```
 
-Happy GPU computing with gpu-lite!
+Happy GPU computing with gpulite!

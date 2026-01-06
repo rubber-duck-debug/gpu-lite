@@ -1,6 +1,6 @@
 # Build Scripts
 
-This directory contains platform-specific build scripts for gpu-lite examples.
+This directory contains platform-specific build scripts for gpulite examples.
 
 ## Scripts
 
@@ -8,17 +8,17 @@ This directory contains platform-specific build scripts for gpu-lite examples.
 - **Platform**: Linux
 - **Requirements**: GCC 7+, Clang 5+, CMake 3.12+
 - **Usage**: `./scripts/build_examples_linux.sh` (from project root)
-- **Description**: Builds all gpu-lite examples using CMake and make
+- **Description**: Builds all gpulite examples using CMake and make
 
 ### `build_examples_windows.bat`
 - **Platform**: Windows
 - **Requirements**: Visual Studio 2017+, CMake 3.12+
 - **Usage**: `scripts\build_examples_windows.bat` (from project root)
-- **Description**: Builds all gpu-lite examples using CMake and Visual Studio
+- **Description**: Builds all gpulite examples using CMake and Visual Studio
 
 ## Usage
 
-All scripts should be run from the gpu-lite root directory:
+All scripts should be run from the gpulite root directory:
 
 ```bash
 # Linux
