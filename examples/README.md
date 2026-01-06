@@ -254,19 +254,4 @@ auto* kernel = KernelFactory::instance().create(
 ```
 
 
-## Integration with Existing Projects
-
-To integrate gpulite examples into your project:
-
-1. Copy the gpulite headers to your project
-2. Add the example code patterns to your application
-3. Link with `-ldl` for dynamic loading
-4. No CUDA SDK installation required!
-
-```cmake
-# In your existing CMakeLists.txt
-target_include_directories(your_app PRIVATE path/to/gpulite/headers)
-target_link_libraries(your_app PRIVATE ${CMAKE_DL_LIBS})
-```
-
 Happy GPU computing with gpulite!
