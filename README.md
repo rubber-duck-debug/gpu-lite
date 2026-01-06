@@ -215,7 +215,7 @@ else()
 endif()
 ```
 
-### Method 3: Using FetchContent
+### Method 3: Using FetchContent (Recommended)
 
 ```cmake
 cmake_minimum_required(VERSION 3.14)
@@ -225,8 +225,8 @@ include(FetchContent)
 
 FetchContent_Declare(
     gpulite
-    GIT_REPOSITORY https://github.com/not-bug-is-feature/gpulite.git
-    GIT_TAG main
+    GIT_REPOSITORY https://github.com/nickjbrowning/gpulite.git
+    GIT_TAG v1.0.0
 )
 
 FetchContent_MakeAvailable(gpulite)
@@ -234,6 +234,11 @@ FetchContent_MakeAvailable(gpulite)
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE gpulite)
 ```
+
+This is the recommended approach because:
+- Dependencies (`${CMAKE_DL_LIBS}`, `Threads`) are automatically linked
+- Include paths are automatically configured
+- Use a specific tag (e.g., `v1.0.0`) for reproducible builds
 
 ## Advanced Usage
 
