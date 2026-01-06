@@ -31,6 +31,11 @@ This directory contains comprehensive examples demonstrating how to use gpulite 
 - **Features**: Multiple data types, template-like kernel generation
 - **Concepts**: Runtime type specialization, kernel naming strategies
 
+### 4. Async Operations (`async_operations/`)
+- **Purpose**: Demonstrates overlapping memory transfers with kernel execution
+- **Features**: Pinned memory, async memcpy, CUDA streams, double buffering
+- **Concepts**: cudaHostAlloc, cudaMemcpyAsync, stream-based concurrency
+
 
 ## Compilation Instructions
 

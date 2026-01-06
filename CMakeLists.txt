@@ -32,6 +32,7 @@ if(BUILD_EXAMPLES)
     add_subdirectory(examples/basic_vector_add)
     add_subdirectory(examples/matrix_multiply)
     add_subdirectory(examples/templated_kernels)
+    add_subdirectory(examples/async_operations)
 endif()
 
 # Installation rules
