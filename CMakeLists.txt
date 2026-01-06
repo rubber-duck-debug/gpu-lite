@@ -36,9 +36,9 @@ endif()
 
 # Installation rules
 install(TARGETS gpu-lite EXPORT gpu-liteConfig)
-install(FILES 
-    gpulite.hpp 
-    DESTINATION include
+install(FILES
+    gpulite/gpulite.hpp
+    DESTINATION include/gpulite
 )
 install(EXPORT gpu-liteConfig DESTINATION lib/cmake/gpu-lite)
 

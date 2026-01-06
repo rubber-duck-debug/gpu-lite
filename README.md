@@ -27,7 +27,7 @@ Traditional CUDA applications require the CUDA SDK to be installed at build time
 ### Basic Usage
 
 ```cpp
-#include "gpulite.hpp"
+#include <gpulite/gpulite.hpp>
 
 int main() {
     // Check if CUDA is available
@@ -185,7 +185,7 @@ target_link_libraries(gpu-lite INTERFACE
 
 # Installation rules
 install(TARGETS gpu-lite EXPORT gpu-liteConfig)
-install(FILES gpulite.hpp DESTINATION include)
+install(FILES gpulite/gpulite.hpp DESTINATION include/gpulite)
 install(EXPORT gpu-liteConfig DESTINATION lib/cmake/gpu-lite)
 ```
 
@@ -204,7 +204,7 @@ set(CMAKE_CXX_STANDARD 17)
 add_executable(my_app 
     main.cpp
     # Copy this header to your project
-    gpu-lite/gpulite.hpp
+    gpulite/gpulite.hpp
 )
 
 # Link required system libraries

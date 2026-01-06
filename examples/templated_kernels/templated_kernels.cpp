@@ -1,4 +1,4 @@
-#include "../../gpulite.hpp"
+#include <gpulite/gpulite.hpp>
 #include <iostream>
 #include <vector>
 #include <random>
