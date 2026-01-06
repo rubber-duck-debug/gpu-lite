@@ -57,14 +57,15 @@ int main() {
     // Allocate device memory and launch kernel
     float *d_a, *d_b, *d_c;
     int n = 1024;
-    
-    CUDART_SAFE_CALL(CUDART_INSTANCE.cudaMalloc(reinterpret_cast<void**>(&d_a), n * sizeof(float)));
-    CUDART_SAFE_CALL(CUDART_INSTANCE.cudaMalloc(reinterpret_cast<void**>(&d_b), n * sizeof(float)));
-    CUDART_SAFE_CALL(CUDART_INSTANCE.cudaMalloc(reinterpret_cast<void**>(&d_c), n * sizeof(float)));
+
+    // Use the cleaner GPULITE_CUDART_CALL macro (hides the global instance)
+    GPULITE_CUDART_CALL(cudaMalloc(reinterpret_cast<void**>(&d_a), n * sizeof(float)));
+    GPULITE_CUDART_CALL(cudaMalloc(reinterpret_cast<void**>(&d_b), n * sizeof(float)));
+    GPULITE_CUDART_CALL(cudaMalloc(reinterpret_cast<void**>(&d_c), n * sizeof(float)));
 
     // Prepare kernel arguments
     std::vector<void*> args = {&d_a, &d_b, &d_c, &n};
-    
+
     // Launch kernel
     kernel->launch(
         dim3((n + 127) / 128),  // grid size
@@ -76,9 +77,9 @@ int main() {
     );
 
     // Clean up
-    CUDART_SAFE_CALL(CUDART_INSTANCE.cudaFree(d_a));
-    CUDART_SAFE_CALL(CUDART_INSTANCE.cudaFree(d_b));
-    CUDART_SAFE_CALL(CUDART_INSTANCE.cudaFree(d_c));
+    GPULITE_CUDART_CALL(cudaFree(d_a));
+    GPULITE_CUDART_CALL(cudaFree(d_b));
+    GPULITE_CUDART_CALL(cudaFree(d_c));
 
     return 0;
 }
@@ -265,21 +266,21 @@ std::cout << "Kernel uses " << reg_count << " registers per thread" << std::endl
 ```cpp
 // Create CUDA stream
 cudaStream_t stream;
-CUDART_SAFE_CALL(CUDART_INSTANCE.cudaStreamCreate(&stream));
+GPULITE_CUDART_CALL(cudaStreamCreate(&stream));
 
 // Launch kernel asynchronously
 kernel->launch(
-    grid, block, shared_mem_size, 
-    reinterpret_cast<void*>(stream), 
-    args, 
+    grid, block, shared_mem_size,
+    reinterpret_cast<void*>(stream),
+    args,
     false  // don't synchronize
 );
 
 // Do other work...
 
 // Synchronize when needed
-CUDART_SAFE_CALL(CUDART_INSTANCE.cudaStreamSynchronize(stream));
-CUDART_SAFE_CALL(CUDART_INSTANCE.cudaStreamDestroy(stream));
+GPULITE_CUDART_CALL(cudaStreamSynchronize(stream));
+GPULITE_CUDART_CALL(cudaStreamDestroy(stream));
 ```
 
 ## Error Handling

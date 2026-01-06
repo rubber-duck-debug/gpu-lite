@@ -75,6 +75,14 @@ enum {
     cudaSuccess = 0
 };
 
+// CUDA Host Alloc flags
+enum {
+    cudaHostAllocDefault = 0x00,
+    cudaHostAllocPortable = 0x01,
+    cudaHostAllocMapped = 0x02,
+    cudaHostAllocWriteCombined = 0x04
+};
+
 // NVRTC constants
 enum {
     NVRTC_SUCCESS = 0
@@ -214,6 +222,10 @@ class CUDART {
     using cudaStreamCreate_t = cudaError_t (*)(cudaStream_t*);
     using cudaStreamDestroy_t = cudaError_t (*)(cudaStream_t);
     using cudaStreamSynchronize_t = cudaError_t (*)(cudaStream_t);
+    using cudaHostAlloc_t = cudaError_t (*)(void**, size_t, unsigned int);
+    using cudaFreeHost_t = cudaError_t (*)(void*);
+    using cudaHostGetDevicePointer_t = cudaError_t (*)(void**, void*, unsigned int);
+    using cudaMemcpyAsync_t = cudaError_t (*)(void*, const void*, size_t, cudaMemcpyKind, cudaStream_t);
 
     cudaGetDeviceCount_t cudaGetDeviceCount;
     cudaGetDevice_t cudaGetDevice;
@@ -230,6 +242,10 @@ class CUDART {
     cudaStreamCreate_t cudaStreamCreate;
     cudaStreamDestroy_t cudaStreamDestroy;
     cudaStreamSynchronize_t cudaStreamSynchronize;
+    cudaHostAlloc_t cudaHostAlloc;
+    cudaFreeHost_t cudaFreeHost;
+    cudaHostGetDevicePointer_t cudaHostGetDevicePointer;
+    cudaMemcpyAsync_t cudaMemcpyAsync;
 
     CUDART() {
 #ifdef __linux__
@@ -265,6 +281,10 @@ class CUDART {
             cudaStreamCreate = load<cudaStreamCreate_t>(cudartHandle, "cudaStreamCreate");
             cudaStreamDestroy = load<cudaStreamDestroy_t>(cudartHandle, "cudaStreamDestroy");
             cudaStreamSynchronize = load<cudaStreamSynchronize_t>(cudartHandle, "cudaStreamSynchronize");
+            cudaHostAlloc = load<cudaHostAlloc_t>(cudartHandle, "cudaHostAlloc");
+            cudaFreeHost = load<cudaFreeHost_t>(cudartHandle, "cudaFreeHost");
+            cudaHostGetDevicePointer = load<cudaHostGetDevicePointer_t>(cudartHandle, "cudaHostGetDevicePointer");
+            cudaMemcpyAsync = load<cudaMemcpyAsync_t>(cudartHandle, "cudaMemcpyAsync");
         }
     }
 
@@ -523,6 +543,12 @@ class NVRTC {
 #define CUDART_INSTANCE CUDART::instance()
 #define CUDA_DRIVER_INSTANCE CUDADriver::instance()
 #define NVRTC_INSTANCE NVRTC::instance()
+
+// Convenience macros for cleaner API - hides the global instance from users
+// Usage: GPULITE_CUDART_CALL(cudaMalloc(&ptr, size))
+//        GPULITE_DRIVER_CALL(cuCtxGetCurrent(&ctx))
+#define GPULITE_CUDART_CALL(func) CUDART_SAFE_CALL(CUDART_INSTANCE.func)
+#define GPULITE_DRIVER_CALL(func) CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.func)
 
 // =============================================================================
 // CUDA Kernel Cache Manager - Runtime compilation and caching system

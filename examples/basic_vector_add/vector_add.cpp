@@ -46,15 +46,15 @@ extern "C" __global__ void vector_add(float* a, float* b, float* c, int n) {
 }
 )";
 
-        // Allocate device memory
+        // Allocate device memory using the cleaner GPULITE_CUDART_CALL macro
         float *d_a, *d_b, *d_c;
-        CUDART_SAFE_CALL(CUDART_INSTANCE.cudaMalloc(reinterpret_cast<void**>(&d_a), size));
-        CUDART_SAFE_CALL(CUDART_INSTANCE.cudaMalloc(reinterpret_cast<void**>(&d_b), size));
-        CUDART_SAFE_CALL(CUDART_INSTANCE.cudaMalloc(reinterpret_cast<void**>(&d_c), size));
+        GPULITE_CUDART_CALL(cudaMalloc(reinterpret_cast<void**>(&d_a), size));
+        GPULITE_CUDART_CALL(cudaMalloc(reinterpret_cast<void**>(&d_b), size));
+        GPULITE_CUDART_CALL(cudaMalloc(reinterpret_cast<void**>(&d_c), size));
 
         // Copy data to device
-        CUDART_SAFE_CALL(CUDART_INSTANCE.cudaMemcpy(d_a, h_a.data(), size, cudaMemcpyHostToDevice));
-        CUDART_SAFE_CALL(CUDART_INSTANCE.cudaMemcpy(d_b, h_b.data(), size, cudaMemcpyHostToDevice));
+        GPULITE_CUDART_CALL(cudaMemcpy(d_a, h_a.data(), size, cudaMemcpyHostToDevice));
+        GPULITE_CUDART_CALL(cudaMemcpy(d_b, h_b.data(), size, cudaMemcpyHostToDevice));
 
         // Create and cache kernel
         auto& factory = KernelFactory::instance();
@@ -131,7 +131,7 @@ extern "C" __global__ void vector_add(float* a, float* b, float* c, int n) {
         std::cout << "  Average: " << avg_time << " μs" << std::endl;
 
         // Copy result back to host
-        CUDART_SAFE_CALL(CUDART_INSTANCE.cudaMemcpy(h_c.data(), d_c, size, cudaMemcpyDeviceToHost));
+        GPULITE_CUDART_CALL(cudaMemcpy(h_c.data(), d_c, size, cudaMemcpyDeviceToHost));
 
         // Verify results
         std::cout << "Verifying results..." << std::endl;
@@ -158,9 +158,9 @@ extern "C" __global__ void vector_add(float* a, float* b, float* c, int n) {
         }
 
         // Clean up device memory
-        CUDART_SAFE_CALL(CUDART_INSTANCE.cudaFree(d_a));
-        CUDART_SAFE_CALL(CUDART_INSTANCE.cudaFree(d_b));
-        CUDART_SAFE_CALL(CUDART_INSTANCE.cudaFree(d_c));
+        GPULITE_CUDART_CALL(cudaFree(d_a));
+        GPULITE_CUDART_CALL(cudaFree(d_b));
+        GPULITE_CUDART_CALL(cudaFree(d_c));
 
         return success ? 0 : 1;
 
