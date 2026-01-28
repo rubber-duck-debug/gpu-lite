@@ -34,7 +34,7 @@ typedef struct _nvrtcProgram* nvrtcProgram;
 // dim3 structure for kernel launch parameters
 struct dim3 {
     unsigned int x, y, z;
-    
+
     dim3(unsigned int x = 1, unsigned int y = 1, unsigned int z = 1) : x(x), y(y), z(z) {}
 };
 
@@ -125,7 +125,7 @@ enum {
 // Dynamic CUDA - Dynamic loading of CUDA runtime libraries
 // =============================================================================
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 #include <dlfcn.h>
 #elif defined(_WIN32)
 #include <windows.h>
@@ -182,7 +182,7 @@ enum {
 
 // Define a template to dynamically load symbols
 template <typename FuncType> FuncType load(void* handle, const char* functionName) {
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
     auto func = reinterpret_cast<FuncType>(dlsym(handle, functionName));
 #elif defined(_WIN32)
     auto func = reinterpret_cast<FuncType>(GetProcAddress(static_cast<HMODULE>(handle), functionName));
@@ -248,7 +248,7 @@ class CUDART {
     cudaMemcpyAsync_t cudaMemcpyAsync;
 
     CUDART() {
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
         cudartHandle = dlopen("libcudart.so", RTLD_NOW);
 #elif defined(_WIN32)
         cudartHandle = LoadLibraryA("cudart64_12.dll");
@@ -289,7 +289,7 @@ class CUDART {
     }
 
     ~CUDART() {
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
         if (cudartHandle) {
             dlclose(cudartHandle);
         }
@@ -385,7 +385,7 @@ class CUDADriver {
     cuPointerGetAttribute_t cuPointerGetAttribute;
 
     CUDADriver() {
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
         cudaHandle = dlopen("libcuda.so", RTLD_NOW);
 #elif defined(_WIN32)
         cudaHandle = LoadLibraryA("nvcuda.dll");
@@ -424,7 +424,7 @@ class CUDADriver {
     }
 
     ~CUDADriver() {
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
         if (cudaHandle) {
             dlclose(cudaHandle);
         }
@@ -486,7 +486,7 @@ class NVRTC {
     nvrtcGetErrorString_t nvrtcGetErrorString;
 
     NVRTC() {
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
         nvrtcHandle = dlopen("libnvrtc.so", RTLD_NOW);
 #elif defined(_WIN32)
         nvrtcHandle = LoadLibraryA("nvrtc64_12.dll");
@@ -520,7 +520,7 @@ class NVRTC {
     }
 
     ~NVRTC() {
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
         if (nvrtcHandle) {
             dlclose(nvrtcHandle);
         }
