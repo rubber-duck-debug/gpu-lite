@@ -1,7 +1,6 @@
 #include <gpulite/gpulite.hpp>
 
 #include <chrono>
-#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <vector>
