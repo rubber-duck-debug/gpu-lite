@@ -19,16 +19,22 @@ if(WIN32)
     # Windows doesn't need explicit dynamic loading libraries
     target_link_libraries(gpulite INTERFACE Threads::Threads)
 else()
-    target_link_libraries(gpulite INTERFACE 
+    target_link_libraries(gpulite INTERFACE
         ${CMAKE_DL_LIBS}
         Threads::Threads
     )
 endif()
 
-# Build examples by default
-option(BUILD_EXAMPLES "Build gpulite examples" ON)
+if (${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
+    set(GPULITE_MAIN_PROJECT ON)
+else()
+    set(GPULITE_MAIN_PROJECT OFF)
+endif()
 
-if(BUILD_EXAMPLES)
+# Build examples by default when building gpu-lite as the main project
+option(GPULITE_BUILD_EXAMPLES "Build gpulite examples" GPULITE_MAIN_PROJECT)
+
+if(GPULITE_BUILD_EXAMPLES)
     add_subdirectory(examples/basic_vector_add)
     add_subdirectory(examples/matrix_multiply)
     add_subdirectory(examples/templated_kernels)
