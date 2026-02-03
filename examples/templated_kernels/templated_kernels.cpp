@@ -18,7 +18,7 @@ void run_templated_example(const std::string& type_name) {
 
     // Initialize host data
     std::vector<T> h_input(N), h_output(N);
-    
+
     // Fill with test data
     if constexpr (std::is_integral_v<T>) {
         for (int i = 0; i < N; i++) {
@@ -45,20 +45,20 @@ __device__ T cube(T x) {
     return x * x * x;
 }
 
-extern "C" __global__ void process_array_)" + type_name + R"(()" + 
-    (std::is_same_v<T, float> ? "float" : 
-     std::is_same_v<T, double> ? "double" : 
-     std::is_same_v<T, int> ? "int" : "long long") + 
-    R"(* input, )" + 
-    (std::is_same_v<T, float> ? "float" : 
-     std::is_same_v<T, double> ? "double" : 
-     std::is_same_v<T, int> ? "int" : "long long") + 
+extern "C" __global__ void process_array_)" + type_name + R"(()" +
+    (std::is_same_v<T, float> ? "float" :
+     std::is_same_v<T, double> ? "double" :
+     std::is_same_v<T, int> ? "int" : "long long") +
+    R"(* input, )" +
+    (std::is_same_v<T, float> ? "float" :
+     std::is_same_v<T, double> ? "double" :
+     std::is_same_v<T, int> ? "int" : "long long") +
     R"(* output, int n) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n) {
         auto val = input[idx];
         // Apply some mathematical operations
-        output[idx] = square(val) + cube(val) / (val + )" + 
+        output[idx] = square(val) + cube(val) / (val + )" +
         (std::is_integral_v<T> ? "1" : "1.0") + R"();
     }
 }
@@ -75,11 +75,11 @@ extern "C" __global__ void process_array_)" + type_name + R"(()" +
 
         // Create templated kernel name using the helper function
         std::string kernel_name = "process_array_" + type_name;
-        
+
         // Create and cache kernel
         auto& factory = KernelFactory::instance();
         std::cout << "Compiling " << type_name << " kernel: " << kernel_name << std::endl;
-        
+
         auto compile_start = std::chrono::high_resolution_clock::now();
         auto* kernel = factory.create(
             kernel_name,                           // templated kernel name
@@ -88,7 +88,7 @@ extern "C" __global__ void process_array_)" + type_name + R"(()" +
             {"-std=c++17", "--use_fast_math"}      // compilation options
         );
         auto compile_end = std::chrono::high_resolution_clock::now();
-        
+
         auto compile_time = std::chrono::duration_cast<std::chrono::milliseconds>(compile_end - compile_start);
         std::cout << "Kernel compiled in: " << compile_time.count() << " ms" << std::endl;
 
@@ -98,22 +98,22 @@ extern "C" __global__ void process_array_)" + type_name + R"(()" +
 
         // Prepare kernel arguments
         std::vector<void*> args = {&d_input, &d_output, const_cast<void*>(static_cast<const void*>(&N))};
-        
+
         // Warmup runs
         std::cout << "Performing warmup runs..." << std::endl;
         for (int i = 0; i < 5; i++) {
             kernel->launch(dim3(blocksPerGrid), dim3(threadsPerBlock), 0, nullptr, args, true);
         }
-        
+
         // Cooldown period
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
+
         // Benchmark runs
         std::cout << "Running performance benchmark..." << std::endl;
         const int num_runs = 20;
         std::vector<double> execution_times;
         execution_times.reserve(num_runs);
-        
+
         for (int run = 0; run < num_runs; run++) {
             auto kernel_start = std::chrono::high_resolution_clock::now();
             kernel->launch(
@@ -125,23 +125,23 @@ extern "C" __global__ void process_array_)" + type_name + R"(()" +
                 true
             );
             auto kernel_end = std::chrono::high_resolution_clock::now();
-            
+
             auto kernel_time = std::chrono::duration_cast<std::chrono::microseconds>(kernel_end - kernel_start);
             execution_times.push_back(kernel_time.count());
-            
+
             // Small cooldown between runs
             if (run < num_runs - 1) {
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
             }
         }
-        
+
         // Calculate statistics
         std::sort(execution_times.begin(), execution_times.end());
         double min_time = execution_times.front();
         double max_time = execution_times.back();
         double median_time = execution_times[num_runs / 2];
         double avg_time = std::accumulate(execution_times.begin(), execution_times.end(), 0.0) / num_runs;
-        
+
         std::cout << "Execution time statistics (μs):" << std::endl;
         std::cout << "  Min: " << std::fixed << std::setprecision(2) << min_time << " μs" << std::endl;
         std::cout << "  Max: " << max_time << " μs" << std::endl;
@@ -160,10 +160,10 @@ extern "C" __global__ void process_array_)" + type_name + R"(()" +
             } else {
                 expected = h_input[i] * h_input[i] + (h_input[i] * h_input[i] * h_input[i]) / (h_input[i] + static_cast<T>(1.0));
             }
-            
+
             T tolerance = std::is_integral_v<T> ? T(0) : static_cast<T>(1e-5);
             if (std::abs(h_output[i] - expected) > tolerance) {
-                std::cout << "Error at index " << i << ": expected " << expected 
+                std::cout << "Error at index " << i << ": expected " << expected
                          << ", got " << h_output[i] << std::endl;
                 success = false;
                 break;
@@ -172,11 +172,11 @@ extern "C" __global__ void process_array_)" + type_name + R"(()" +
 
         if (success) {
             std::cout << "SUCCESS: " << type_name << " templated kernel executed correctly!" << std::endl;
-            
+
             // Performance metrics using different time estimates
             double bandwidth_avg = (2.0 * N * sizeof(T)) / (avg_time * 1e-6) / 1e9;
             double bandwidth_peak = (2.0 * N * sizeof(T)) / (min_time * 1e-6) / 1e9;
-            std::cout << "Memory bandwidth (average): " << std::fixed << std::setprecision(2) 
+            std::cout << "Memory bandwidth (average): " << std::fixed << std::setprecision(2)
                       << bandwidth_avg << " GB/s" << std::endl;
             std::cout << "Memory bandwidth (peak): " << bandwidth_peak << " GB/s" << std::endl;
         } else {
@@ -208,22 +208,22 @@ int main() {
         run_templated_example<float>("float");
         run_templated_example<double>("double");
         run_templated_example<int>("int");
-        
+
         std::cout << "\n=== Advanced Template Example ===" << std::endl;
-        
+
         // Example showing how to use the getKernelName helper for true C++ templates
         const char* template_kernel = R"(
 template<typename T, int BLOCK_SIZE>
 __global__ void reduction_sum(T* input, T* output, int n) {
     extern __shared__ T sdata[];
-    
+
     int tid = threadIdx.x;
     int i = blockIdx.x * BLOCK_SIZE + threadIdx.x;
-    
+
     // Load data into shared memory
     sdata[tid] = (i < n) ? input[i] : 0;
     __syncthreads();
-    
+
     // Perform reduction
     for (int s = BLOCK_SIZE / 2; s > 0; s >>= 1) {
         if (tid < s && i + s < n) {
@@ -231,7 +231,7 @@ __global__ void reduction_sum(T* input, T* output, int n) {
         }
         __syncthreads();
     }
-    
+
     // Write result
     if (tid == 0) {
         output[blockIdx.x] = sdata[0];
