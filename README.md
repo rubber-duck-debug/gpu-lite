@@ -270,7 +270,7 @@ try {
 
 **Linux:**
 - `libcuda.so` - CUDA Driver API
-- `libcudart.so` - CUDA Runtime API  
+- `libcudart.so` - CUDA Runtime API
 - `libnvrtc.so` - NVIDIA Runtime Compilation API
 
 **Windows:**
