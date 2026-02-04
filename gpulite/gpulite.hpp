@@ -559,7 +559,10 @@ class NVRTC {
 #include <unordered_map>
 #include <memory>
 #include <typeinfo>
+
+#if defined(__GNUC__) || defined(__clang__)
 #include <cxxabi.h>
+#endif
 
 // Helper function to demangle the type name if necessary
 std::string demangleTypeName(const std::string& name) {
@@ -570,7 +573,8 @@ std::string demangleTypeName(const std::string& name) {
     );
     return (status == 0) ? demangled_name.get() : name;
 #else
-    throw std::runtime_error("demangling not supported using this toolchain.");
+    // not ideal, but better than nothing on other compilers
+    return name;
 #endif
 }
 
