@@ -803,7 +803,7 @@ class CachedKernel {
         CUdevice cuDevice;
         CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuCtxGetDevice(&cuDevice));
 
-        // Check if debug option is enabled - need to know early for source file handling
+        // Check if debug option is enabled
         const bool enableDebug = std::any_of(
             this->options.cbegin(), this->options.cend(),
             [](const std::string& opt) {
@@ -820,7 +820,7 @@ class CachedKernel {
             if (getcwd(cwd, sizeof(cwd)) != nullptr) {
                 effective_source_name = std::string(cwd) + "/" + this->source_name;
             }
-            // Write the kernel source code to the file
+
             std::ofstream debug_source_file(effective_source_name);
             if (debug_source_file.is_open()) {
                 debug_source_file << this->kernel_code;
