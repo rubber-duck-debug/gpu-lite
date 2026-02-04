@@ -117,6 +117,10 @@ enum {
     CU_MEMORYTYPE_UNIFIED = 0x04
 };
 
+typedef enum CUjit_option_enum {
+    CU_JIT_GENERATE_DEBUG_INFO = 11,
+} CUjit_option;
+
 #ifdef __cplusplus
 }
 #endif
@@ -127,8 +131,11 @@ enum {
 
 #if defined(__linux__) || defined(__APPLE__)
 #include <dlfcn.h>
+#include <unistd.h>  // for getcwd
 #elif defined(_WIN32)
 #include <windows.h>
+#include <direct.h>  // for _getcwd
+#define getcwd _getcwd
 #else
 #error "Platform not supported"
 #endif
@@ -332,7 +339,7 @@ class CUDADriver {
     using cuCtxDestroy_t = CUresult (*)(CUcontext);
     using cuCtxGetCurrent_t = CUresult (*)(CUcontext*);
     using cuCtxSetCurrent_t = CUresult (*)(CUcontext);
-    using cuModuleLoadDataEx_t = CUresult (*)(CUmodule*, const void*, unsigned int, int*, int*);
+    using cuModuleLoadDataEx_t = CUresult (*)(CUmodule*, const void*, unsigned int, CUjit_option*, void**);
     using cuModuleGetFunction_t = CUresult (*)(CUfunction*, CUmodule, const char*);
     using cuFuncSetAttribute_t = CUresult (*)(CUfunction, CUfunction_attribute, int);
     using cuFuncGetAttribute_t = CUresult (*)(int*, CUfunction_attribute, CUfunction);
@@ -796,10 +803,39 @@ class CachedKernel {
         CUdevice cuDevice;
         CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuCtxGetDevice(&cuDevice));
 
+        // Check if debug option is enabled - need to know early for source file handling
+        const bool enableDebug = std::any_of(
+            this->options.cbegin(), this->options.cend(),
+            [](const std::string& opt) {
+                return opt == "-G" || opt == "--device-debug";
+            }
+        );
+
+        // When debugging, write source to a real file so cuda-gdb can find it
+        std::string effective_source_name = this->source_name;
+        if (enableDebug) {
+            // Create a debug source file in the current working directory
+            // Use absolute path so cuda-gdb can reliably find it
+            char cwd[4096];
+            if (getcwd(cwd, sizeof(cwd)) != nullptr) {
+                effective_source_name = std::string(cwd) + "/" + this->source_name;
+            }
+            // Write the kernel source code to the file
+            std::ofstream debug_source_file(effective_source_name);
+            if (debug_source_file.is_open()) {
+                debug_source_file << this->kernel_code;
+                debug_source_file.close();
+            } else {
+                throw std::runtime_error(
+                    "Failed to write debug source file: " + effective_source_name
+                );
+            }
+        }
+
         nvrtcProgram prog;
 
         NVRTC_SAFE_CALL(NVRTC_INSTANCE.nvrtcCreateProgram(
-            &prog, this->kernel_code.c_str(), this->source_name.c_str(), 0, nullptr, nullptr
+            &prog, this->kernel_code.c_str(), effective_source_name.c_str(), 0, nullptr, nullptr
         ));
 
         NVRTC_SAFE_CALL(NVRTC_INSTANCE.nvrtcAddNameExpression(prog, this->kernel_name.c_str()));
@@ -843,7 +879,24 @@ class CachedKernel {
 
         // load the module from cubin
         CUmodule module = nullptr;
-        CUresult cuResult = CUDA_DRIVER_INSTANCE.cuModuleLoadDataEx(&module, cubin.data(), 0, 0, 0);
+        CUresult cuResult;
+
+        if (enableDebug) {
+            // Load with JIT debug info
+            CUjit_option opts[1];
+            opts[0] = CU_JIT_GENERATE_DEBUG_INFO;
+            void** vals = new void*[1];
+            vals[0] = (void*)(size_t)1;
+            cuResult = CUDA_DRIVER_INSTANCE.cuModuleLoadDataEx(
+                &module, cubin.data(), 1, opts, vals
+            );
+            delete[] vals;
+        } else {
+            // Load without JIT options
+            cuResult = CUDA_DRIVER_INSTANCE.cuModuleLoadDataEx(
+                &module, cubin.data(), 0, 0, 0
+            );
+        }
 
         if (cuResult != CUDA_SUCCESS) {
             throw std::runtime_error(
