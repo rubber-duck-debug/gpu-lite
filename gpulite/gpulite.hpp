@@ -3,6 +3,18 @@
 #ifndef GPULITE_HPP
 #define GPULITE_HPP
 
+#if defined(_MSC_VER)
+  // MSVC historically reports __cplusplus wrong unless /Zc:__cplusplus is enabled,
+  // so prefer _MSVC_LANG there.
+  #if !defined(_MSVC_LANG) || _MSVC_LANG < 201703L
+    #error "This project requires C++17 or newer (/std:c++17)."
+  #endif
+#else
+  #if __cplusplus < 201703L
+    #error "This project requires C++17 or newer (-std=c++17)."
+  #endif
+#endif
+
 // =============================================================================
 // CUDA Types Wrapper - Minimal CUDA type definitions for build-time independence
 // =============================================================================
