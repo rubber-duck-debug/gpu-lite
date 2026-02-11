@@ -144,7 +144,9 @@ enum {
 #else
 #error "Platform not supported"
 #endif
+
 #include <stdexcept>
+#include <mutex>
 #include <string>
 #include <functional>
 #include <unordered_map>
@@ -916,12 +918,7 @@ Factory class to create and store compiled cuda kernels for caching as a simple 
 Allows both compiling from a source file, or for compiling from a variable containing CUDA code.
 */
 class KernelFactory {
-
   public:
-    static KernelFactory& instance() {
-        static KernelFactory instance;
-        return instance;
-    }
 
     void cacheKernel(
         const std::string& kernel_name,
@@ -929,20 +926,24 @@ class KernelFactory {
         const std::string& source_name,
         const std::vector<std::string>& options
     ) {
-        kernel_cache[kernel_name] =
+        std::lock_guard<std::mutex> kernel_cache_lock(kernel_cache_mutex_);
+        kernel_cache_[kernel_name] =
             std::make_unique<CachedKernel>(kernel_name, source_path, source_name, options);
     }
 
-    bool hasKernel(const std::string& kernel_name) const {
-        return kernel_cache.find(kernel_name) != kernel_cache.end();
+    bool hasKernel(const std::string& kernel_name) {
+        std::lock_guard<std::mutex> kernel_cache_lock(kernel_cache_mutex_);
+        return kernel_cache_.find(kernel_name) != kernel_cache_.end();
     }
 
-    CachedKernel* getKernel(const std::string& kernel_name) const {
-        auto it = kernel_cache.find(kernel_name);
-        if (it != kernel_cache.end()) {
+    CachedKernel* getKernel(const std::string& kernel_name) {
+        std::lock_guard<std::mutex> kernel_cache_lock(kernel_cache_mutex_);
+        auto it = kernel_cache_.find(kernel_name);
+        if (it != kernel_cache_.end()) {
             return it->second.get();
+        } else {
+            throw std::runtime_error("Kernel not found in cache.");
         }
-        throw std::runtime_error("Kernel not found in cache.");
     }
 
     /*
@@ -979,10 +980,14 @@ class KernelFactory {
 
   private:
     KernelFactory() {}
-    std::unordered_map<std::string, std::unique_ptr<CachedKernel>> kernel_cache;
+    std::unordered_map<std::string, std::unique_ptr<CachedKernel>> kernel_cache_;
+
+    static std::mutex kernel_cache_mutex_;
 
     KernelFactory(const KernelFactory&) = delete;
     KernelFactory& operator=(const KernelFactory&) = delete;
 };
+
+inline std::mutex KernelFactory::kernel_cache_mutex_;
 
 #endif // GPULITE_HPP
