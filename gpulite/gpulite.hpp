@@ -152,6 +152,8 @@ enum {
 #include <unordered_map>
 #include <any>
 #include <sstream>
+#include <list>
+#include <vector>
 
 #define NVRTC_SAFE_CALL(x)                                                                         \
     do {                                                                                           \
@@ -919,6 +921,25 @@ Allows both compiling from a source file, or for compiling from a variable conta
 */
 class KernelFactory {
   public:
+    KernelFactory(const KernelFactory&) = delete;
+    KernelFactory& operator=(const KernelFactory&) = delete;
+
+    KernelFactory(KernelFactory&&) = default;
+    KernelFactory& operator=(KernelFactory&&) = default;
+
+    // Get the singleton instance of the KernelFactory for a given CUDA device.
+    // This ensures that each CUDA device has its own kernel cache.
+    static KernelFactory& instance(CUdevice device) {
+        static std::list<KernelFactory> INSTANCES;
+        for (size_t i = INSTANCES.size(); i < device + 1; i++) {
+            INSTANCES.emplace_back(KernelFactory());
+        }
+
+        // get the element at index "device" in the list and return it
+        auto it = INSTANCES.begin();
+        std::advance(it, device);
+        return *it;
+    }
 
     void cacheKernel(
         const std::string& kernel_name,
@@ -983,9 +1004,6 @@ class KernelFactory {
     std::unordered_map<std::string, std::unique_ptr<CachedKernel>> kernel_cache_;
 
     static std::mutex kernel_cache_mutex_;
-
-    KernelFactory(const KernelFactory&) = delete;
-    KernelFactory& operator=(const KernelFactory&) = delete;
 };
 
 inline std::mutex KernelFactory::kernel_cache_mutex_;
