@@ -145,8 +145,12 @@ typedef enum CUjit_option_enum {
 #include <unistd.h>  // for getcwd
 #elif defined(_WIN32)
 #include <windows.h>
+#include <libloaderapi.h>
+
 #include <direct.h>  // for _getcwd
 #define getcwd _getcwd
+
+#include <filesystem>
 #else
 #error "Platform not supported"
 #endif
@@ -213,6 +217,185 @@ template <typename FuncType> FuncType load(void* handle, const char* functionNam
     return func;
 }
 
+#ifdef _WIN32
+
+namespace details {
+
+inline std::wstring GetEnvVar(const wchar_t* name) {
+    DWORD n = GetEnvironmentVariableW(name, nullptr, 0);
+    if (n == 0) return L"";
+    std::wstring val(n, L'\0');
+    GetEnvironmentVariableW(name, val.data(), n);
+    if (!val.empty() && val.back() == L'\0') val.pop_back();
+    return val;
+}
+
+// Parse versions from filenames like cudart64_90.dll, cudart64_12.dll, cudart64_120.dll
+inline int ParseCudartVersionScore(std::wstring prefix, const std::wstring& filename) {
+    // Return a score; higher = preferred. Unknown parse => 0.
+
+    prefix = prefix + L"_";
+    // We try to parse digits after `prefix` and before ".dll".
+    if (filename.rfind(prefix, 0) != 0) {
+        return 0;
+    }
+
+    size_t start = prefix.size();
+    size_t end = filename.find(L".dll");
+    if (end == std::wstring::npos || end <= start) {
+        return 0;
+    }
+
+    std::wstring num = filename.substr(start, end - start);
+    if (num.empty()) {
+        return 0;
+    }
+    for (wchar_t c : num) {
+        if (c < L'0' || c > L'9') {
+            return 0;
+        }
+    }
+
+    // e.g. "90" -> 90, "12" -> 12, "120" -> 120
+    return std::stoi(num);
+}
+
+
+inline std::vector<std::filesystem::path> CandidateCudaDirs() {
+    std::vector<std::filesystem::path> dirs;
+
+    // 1) CUDA_PATH\bin and CUDA_PATH\bin\x64
+    std::wstring cudaPath = GetEnvVar(L"CUDA_PATH");
+    if (!cudaPath.empty()) {
+        dirs.push_back(std::filesystem::path(cudaPath) / L"bin");
+        dirs.push_back(std::filesystem::path(cudaPath) / L"bin" / L"x64");
+    }
+
+    // 2) Search in PATH
+    std::wstring pathEnv = GetEnvVar(L"PATH");
+    if (!pathEnv.empty()) {
+        size_t start = 0;
+        size_t end = pathEnv.find(L';');
+        while (end != std::wstring::npos) {
+            std::wstring token = pathEnv.substr(start, end - start);
+            if (!token.empty()) {
+                dirs.push_back(std::filesystem::path(token));
+            }
+            start = end + 1;
+            end = pathEnv.find(L';', start);
+        }
+        std::wstring token = pathEnv.substr(start);
+        if (!token.empty()) {
+            dirs.push_back(std::filesystem::path(token));
+        }
+    }
+
+    // 3) Default toolkit install root (scan versions)
+    //    C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v*\bin
+    std::filesystem::path root = L"C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA";
+
+    std::error_code ec;
+    std::filesystem::directory_options options = std::filesystem::directory_options::skip_permission_denied;
+    for (auto& entry: std::filesystem::directory_iterator(root, options, ec)) {
+        if (ec) {
+            break;
+        }
+
+        // folders like v12.4, v13.0, etc.
+        if (!entry.is_directory(ec) || ec) {
+            continue;
+        }
+
+        dirs.push_back(entry.path() / L"bin");
+        dirs.push_back(entry.path() / L"bin" / L"x64");
+    }
+
+    // De-dup + keep only existing dirs
+    std::sort(dirs.begin(), dirs.end());
+    dirs.erase(std::unique(dirs.begin(), dirs.end()), dirs.end());
+    dirs.erase(
+        std::remove_if(dirs.begin(), dirs.end(), [](const std::filesystem::path& p) {
+            assert(!p.empty());
+
+            std::error_code ec;
+            if (!std::filesystem::exists(p, ec) || ec) {
+                return true;
+            }
+
+            if (!std::filesystem::is_directory(p, ec) || ec) {
+                return true;
+            }
+
+            return false;
+
+        }),
+        dirs.end()
+    );
+    return dirs;
+}
+
+inline std::optional<std::filesystem::path> FindBestCudaDll(const std::wstring& prefix) {
+    auto dirs = CandidateCudaDirs();
+
+    struct Match {
+        std::filesystem::path path;
+        int score;
+    };
+    std::vector<Match> matches;
+
+    for (const auto& d: dirs) {
+        std::error_code ec;
+        std::filesystem::directory_options options = std::filesystem::directory_options::skip_permission_denied;
+        for (auto& e: std::filesystem::directory_iterator(d, options, ec)) {
+            if (ec) {
+                break;
+            }
+
+            if (!e.is_regular_file(ec) || ec) {
+                continue;
+            }
+
+            auto name = e.path().filename().wstring();
+            // Must look like <prefix>*.dll
+            if (name.size() < prefix.size() + 4) {
+                continue;
+            }
+
+            if (name.rfind(prefix, 0) != 0) {
+                continue;
+            }
+
+            if (e.path().extension().wstring() != L".dll") {
+                continue;
+            }
+
+            int score = ParseCudartVersionScore(prefix, name);
+            // Prefer versioned DLLs; still accept plain "<prefix>.dll" with score 1
+            if (name == prefix + L".dll") {
+                score = std::max(score, 1);
+            }
+
+            matches.push_back({ e.path(), score });
+        }
+    }
+
+    if (matches.empty()) {
+        return std::nullopt;
+    }
+
+    // Prefer highest score; if tie, prefer shortest path (arbitrary stable tie-break)
+    std::sort(matches.begin(), matches.end(), [](const Match& a, const Match& b) {
+        if (a.score != b.score) return a.score > b.score;
+        return a.path.wstring().size() < b.path.wstring().size();
+    });
+
+    return matches.front().path;
+}
+
+} // namespace details
+
+#endif
+
 /*
 This class allows us to dynamically load the CUDA runtime and reference the functions contained
 within the libcudart.so library (see CUDA Runtime API:
@@ -271,12 +454,20 @@ class CUDART {
 #if defined(__linux__) || defined(__APPLE__)
         cudartHandle = dlopen("libcudart.so", RTLD_NOW);
 #elif defined(_WIN32)
-        cudartHandle = LoadLibraryA("cudart64_12.dll");
-        if (!cudartHandle) {
-            cudartHandle = LoadLibraryA("cudart64_11.dll");
-        }
-        if (!cudartHandle) {
-            cudartHandle = LoadLibraryA("cudart64_10.dll");
+        auto dllPathOpt = details::FindBestCudaDll(L"cudart64");
+        if (dllPathOpt) {
+            auto dllPath = *dllPathOpt;
+            auto dir = dllPath.parent_path();
+            // add the directory containing the DLL to the search path
+            SetDllDirectoryW(dir.c_str());
+
+            cudartHandle = LoadLibraryExW(
+                dllPath.c_str(),
+                nullptr,
+                LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                LOAD_LIBRARY_SEARCH_DEFAULT_DIRS |
+                LOAD_LIBRARY_SEARCH_USER_DIRS
+            );
         }
 #else
 #error "Platform not supported"
@@ -509,12 +700,20 @@ class NVRTC {
 #if defined(__linux__) || defined(__APPLE__)
         nvrtcHandle = dlopen("libnvrtc.so", RTLD_NOW);
 #elif defined(_WIN32)
-        nvrtcHandle = LoadLibraryA("nvrtc64_12.dll");
-        if (!nvrtcHandle) {
-            nvrtcHandle = LoadLibraryA("nvrtc64_11.dll");
-        }
-        if (!nvrtcHandle) {
-            nvrtcHandle = LoadLibraryA("nvrtc64_10.dll");
+        auto dllPathOpt = details::FindBestCudaDll(L"nvrtc64");
+        if (dllPathOpt) {
+            auto dllPath = *dllPathOpt;
+            // add the directory containing the DLL to the search path
+            auto dir = dllPath.parent_path();
+            SetDllDirectoryW(dir.c_str());
+
+            nvrtcHandle = LoadLibraryExW(
+                dllPath.c_str(),
+                nullptr,
+                LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                LOAD_LIBRARY_SEARCH_DEFAULT_DIRS |
+                LOAD_LIBRARY_SEARCH_USER_DIRS
+            );
         }
 #else
 #error "Platform not supported"
