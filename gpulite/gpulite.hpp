@@ -3,6 +3,18 @@
 #ifndef GPULITE_HPP
 #define GPULITE_HPP
 
+#if defined(_MSC_VER)
+  // MSVC historically reports __cplusplus wrong unless /Zc:__cplusplus is enabled,
+  // so prefer _MSVC_LANG there.
+  #if !defined(_MSVC_LANG) || _MSVC_LANG < 201703L
+    #error "This project requires C++17 or newer (/std:c++17)."
+  #endif
+#else
+  #if __cplusplus < 201703L
+    #error "This project requires C++17 or newer (-std=c++17)."
+  #endif
+#endif
+
 // =============================================================================
 // CUDA Types Wrapper - Minimal CUDA type definitions for build-time independence
 // =============================================================================
@@ -140,9 +152,12 @@ typedef enum CUjit_option_enum {
 #endif
 
 #include <stdexcept>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <sstream>
+#include <list>
+#include <vector>
 
 #define NVRTC_SAFE_CALL(x)                                                                         \
     do {                                                                                           \
@@ -959,11 +974,25 @@ Factory class to create and store compiled cuda kernels for caching as a simple 
 Allows both compiling from a source file, or for compiling from a variable containing CUDA code.
 */
 class KernelFactory {
-
   public:
-    static KernelFactory& instance() {
-        static KernelFactory instance;
-        return instance;
+    KernelFactory(const KernelFactory&) = delete;
+    KernelFactory& operator=(const KernelFactory&) = delete;
+
+    KernelFactory(KernelFactory&&) = default;
+    KernelFactory& operator=(KernelFactory&&) = default;
+
+    // Get the singleton instance of the KernelFactory for a given CUDA device.
+    // This ensures that each CUDA device has its own kernel cache.
+    static KernelFactory& instance(CUdevice device) {
+        static std::list<KernelFactory> INSTANCES;
+        for (size_t i = INSTANCES.size(); i < device + 1; i++) {
+            INSTANCES.emplace_back(KernelFactory());
+        }
+
+        // get the element at index "device" in the list and return it
+        auto it = INSTANCES.begin();
+        std::advance(it, device);
+        return *it;
     }
 
     void cacheKernel(
@@ -972,20 +1001,24 @@ class KernelFactory {
         const std::string& source_name,
         const std::vector<std::string>& options
     ) {
-        kernel_cache[kernel_name] =
+        std::lock_guard<std::mutex> kernel_cache_lock(kernel_cache_mutex_);
+        kernel_cache_[kernel_name] =
             std::make_unique<CachedKernel>(kernel_name, source_path, source_name, options);
     }
 
-    bool hasKernel(const std::string& kernel_name) const {
-        return kernel_cache.find(kernel_name) != kernel_cache.end();
+    bool hasKernel(const std::string& kernel_name) {
+        std::lock_guard<std::mutex> kernel_cache_lock(kernel_cache_mutex_);
+        return kernel_cache_.find(kernel_name) != kernel_cache_.end();
     }
 
-    CachedKernel* getKernel(const std::string& kernel_name) const {
-        auto it = kernel_cache.find(kernel_name);
-        if (it != kernel_cache.end()) {
+    CachedKernel* getKernel(const std::string& kernel_name) {
+        std::lock_guard<std::mutex> kernel_cache_lock(kernel_cache_mutex_);
+        auto it = kernel_cache_.find(kernel_name);
+        if (it != kernel_cache_.end()) {
             return it->second.get();
+        } else {
+            throw std::runtime_error("Kernel not found in cache.");
         }
-        throw std::runtime_error("Kernel not found in cache.");
     }
 
     /*
@@ -1022,10 +1055,11 @@ class KernelFactory {
 
   private:
     KernelFactory() {}
-    std::unordered_map<std::string, std::unique_ptr<CachedKernel>> kernel_cache;
+    std::unordered_map<std::string, std::unique_ptr<CachedKernel>> kernel_cache_;
 
-    KernelFactory(const KernelFactory&) = delete;
-    KernelFactory& operator=(const KernelFactory&) = delete;
+    static std::mutex kernel_cache_mutex_;
 };
+
+inline std::mutex KernelFactory::kernel_cache_mutex_;
 
 #endif // GPULITE_HPP
