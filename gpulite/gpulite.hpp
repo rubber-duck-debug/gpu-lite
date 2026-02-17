@@ -8,7 +8,6 @@
 // =============================================================================
 
 #include <stddef.h>
-#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -132,11 +131,10 @@ enum {
 #else
 #error "Platform not supported"
 #endif
+
 #include <stdexcept>
 #include <string>
-#include <functional>
 #include <unordered_map>
-#include <any>
 #include <sstream>
 
 #define NVRTC_SAFE_CALL(x)                                                                         \
@@ -562,7 +560,7 @@ class NVRTC {
 #include <cxxabi.h>
 
 // Helper function to demangle the type name if necessary
-std::string demangleTypeName(const std::string& name) {
+inline std::string demangleTypeName(const std::string& name) {
 #if defined(__GNUC__) || defined(__clang__)
     int status = 0;
     std::unique_ptr<char, void (*)(void*)> demangled_name(
@@ -575,7 +573,7 @@ std::string demangleTypeName(const std::string& name) {
 }
 
 // Base case: No template arguments, return function name without any type information
-std::string getKernelName(const std::string& fn_name) { return fn_name; }
+inline std::string getKernelName(const std::string& fn_name) { return fn_name; }
 
 // Function to get type name of a single type
 template <typename T> std::string typeName() { return demangleTypeName(typeid(T).name()); }
@@ -606,7 +604,7 @@ template <typename T, typename... Ts> std::string getKernelName(const std::strin
 }
 
 // Function to load CUDA source code from a file
-std::string load_cuda_source(const std::string& filename) {
+inline std::string load_cuda_source(const std::string& filename) {
     std::ifstream file(filename);
     if (!file.is_open()) {
         throw std::runtime_error("Failed to open file: " + filename);
