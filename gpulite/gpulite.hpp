@@ -452,7 +452,20 @@ class CUDART {
 
     CUDART() {
 #if defined(__linux__) || defined(__APPLE__)
-        cudartHandle = dlopen("libcudart.so", RTLD_NOW);
+        static const char* CANDIDATES[] = {
+            "libcudart.so",
+            "libcudart.so.11",
+            "libcudart.so.12",
+            "libcudart.so.13",
+            "libcudart.so.14",
+            "libcudart.so.15",
+        };
+        for (auto* candidate: CANDIDATES) {
+            cudartHandle = dlopen(candidate, RTLD_NOW);
+            if (cudartHandle) {
+                break;
+            }
+        }
 #elif defined(_WIN32)
         auto dllPathOpt = details::FindBestCudaDll(L"cudart64");
         if (dllPathOpt) {
@@ -698,7 +711,21 @@ class NVRTC {
 
     NVRTC() {
 #if defined(__linux__) || defined(__APPLE__)
-        nvrtcHandle = dlopen("libnvrtc.so", RTLD_NOW);
+        static const char* CANDIDATES[] = {
+            "libnvrtc.so",
+            "libnvrtc.so.11",
+            "libnvrtc.so.12",
+            "libnvrtc.so.13",
+            "libnvrtc.so.14",
+            "libnvrtc.so.15",
+        };
+        for (auto* candidate: CANDIDATES) {
+            nvrtcHandle = dlopen(candidate, RTLD_NOW);
+            if (nvrtcHandle != nullptr) {
+                break;
+            }
+        }
+
 #elif defined(_WIN32)
         auto dllPathOpt = details::FindBestCudaDll(L"nvrtc64");
         if (dllPathOpt) {
