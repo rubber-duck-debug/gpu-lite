@@ -155,6 +155,7 @@ typedef enum CUjit_option_enum {
 #error "Platform not supported"
 #endif
 
+#include <algorithm>
 #include <stdexcept>
 #include <mutex>
 #include <string>
