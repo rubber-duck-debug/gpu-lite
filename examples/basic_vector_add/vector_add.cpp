@@ -12,7 +12,7 @@
 int main() {
     try {
         // Check if CUDA is available
-        if (!CUDA_DRIVER_INSTANCE.loaded() || !NVRTC_INSTANCE.loaded() || !CUDART_INSTANCE.loaded()) {
+        if (!CUDADriver::loaded() || !NVRTC::loaded() || !CUDART::loaded()) {
             std::cout << "CUDA runtime libraries not available. Please install the CUDA SDK and drivers." << std::endl;
             return 1;
         }

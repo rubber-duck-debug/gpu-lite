@@ -68,11 +68,11 @@ extern "C" __global__ void process_array_)" + type_name + R"(()" +
     try {
         // Allocate device memory
         T *d_input, *d_output;
-        CUDART_SAFE_CALL(CUDART_INSTANCE.cudaMalloc(reinterpret_cast<void**>(&d_input), size));
-        CUDART_SAFE_CALL(CUDART_INSTANCE.cudaMalloc(reinterpret_cast<void**>(&d_output), size));
+        GPULITE_CUDART_CALL(cudaMalloc(reinterpret_cast<void**>(&d_input), size));
+        GPULITE_CUDART_CALL(cudaMalloc(reinterpret_cast<void**>(&d_output), size));
 
         // Copy input data to device
-        CUDART_SAFE_CALL(CUDART_INSTANCE.cudaMemcpy(d_input, h_input.data(), size, cudaMemcpyHostToDevice));
+        GPULITE_CUDART_CALL(cudaMemcpy(d_input, h_input.data(), size, cudaMemcpyHostToDevice));
 
         // Create templated kernel name using the helper function
         std::string kernel_name = "process_array_" + type_name;
@@ -150,7 +150,7 @@ extern "C" __global__ void process_array_)" + type_name + R"(()" +
         std::cout << "  Average: " << avg_time << " μs" << std::endl;
 
         // Copy result back to host
-        CUDART_SAFE_CALL(CUDART_INSTANCE.cudaMemcpy(h_output.data(), d_output, size, cudaMemcpyDeviceToHost));
+        GPULITE_CUDART_CALL(cudaMemcpy(h_output.data(), d_output, size, cudaMemcpyDeviceToHost));
 
         // Verify results (spot check)
         bool success = true;
@@ -185,8 +185,8 @@ extern "C" __global__ void process_array_)" + type_name + R"(()" +
         }
 
         // Clean up
-        CUDART_SAFE_CALL(CUDART_INSTANCE.cudaFree(d_input));
-        CUDART_SAFE_CALL(CUDART_INSTANCE.cudaFree(d_output));
+        GPULITE_CUDART_CALL(cudaFree(d_input));
+        GPULITE_CUDART_CALL(cudaFree(d_output));
 
     } catch (const std::exception& e) {
         std::cerr << "Error in " << type_name << " example: " << e.what() << std::endl;
@@ -196,7 +196,7 @@ extern "C" __global__ void process_array_)" + type_name + R"(()" +
 int main() {
     try {
         // Check if CUDA is available
-        if (!CUDA_DRIVER_INSTANCE.loaded() || !NVRTC_INSTANCE.loaded() || !CUDART_INSTANCE.loaded()) {
+        if (!CUDADriver::loaded() || !NVRTC::loaded() || !CUDART::loaded()) {
             std::cout << "CUDA runtime libraries not available. Please install NVIDIA drivers." << std::endl;
             return 1;
         }

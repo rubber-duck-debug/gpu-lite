@@ -108,15 +108,11 @@ typedef struct cudaPointerAttributes {
 } cudaPointerAttributes;
 
 // CUDA Driver API constants
-enum {
-    CUDA_SUCCESS = 0,
-    CUDA_ERROR_NOT_INITIALIZED = 3
-};
+#define CUDA_SUCCESS 0
+#define CUDA_ERROR_NOT_INITIALIZED 3
 
 // CUDA Runtime API constants
-enum {
-    cudaSuccess = 0
-};
+#define cudaSuccess 0
 
 // CUDA Host Alloc flags
 enum {
@@ -127,9 +123,7 @@ enum {
 };
 
 // NVRTC constants
-enum {
-    NVRTC_SUCCESS = 0
-};
+#define NVRTC_SUCCESS 0
 
 // CUDA device attributes
 typedef enum CUdevice_attribute {
@@ -171,48 +165,6 @@ typedef enum CUjit_option_enum {
 // =============================================================================
 // Dynamic CUDA - Dynamic loading of CUDA runtime libraries
 // =============================================================================
-
-
-#define NVRTC_SAFE_CALL(x)                                                                         \
-    do {                                                                                           \
-        nvrtcResult result = x;                                                                    \
-        if (result != NVRTC_SUCCESS) {                                                             \
-            std::ostringstream errorMsg;                                                           \
-            errorMsg << "\nerror: " #x " failed with error "                                       \
-                     << NVRTC_INSTANCE.nvrtcGetErrorString(result) << '\n'                         \
-                     << "File: " << __FILE__ << '\n'                                               \
-                     << "Line: " << static_cast<int>(__LINE__) << '\n';                            \
-            throw std::runtime_error(errorMsg.str());                                              \
-        }                                                                                          \
-    } while (0)
-
-#define CUDADRIVER_SAFE_CALL(x)                                                                    \
-    do {                                                                                           \
-        CUresult result = x;                                                                       \
-        if (result != CUDA_SUCCESS) {                                                              \
-            const char* msg;                                                                       \
-            CUDA_DRIVER_INSTANCE.cuGetErrorName(result, &msg);                                     \
-            std::ostringstream errorMsg;                                                           \
-            errorMsg << "\nerror: " #x " failed with error " << (msg ? msg : "Unknown error")      \
-                     << '\n'                                                                       \
-                     << "File: " << __FILE__ << '\n'                                               \
-                     << "Line: " << static_cast<int>(__LINE__) << '\n';                            \
-            throw std::runtime_error(errorMsg.str());                                              \
-        }                                                                                          \
-    } while (0)
-
-#define CUDART_SAFE_CALL(call)                                                                     \
-    do {                                                                                           \
-        cudaError_t cudaStatus = (call);                                                           \
-        if (cudaStatus != cudaSuccess) {                                                           \
-            std::ostringstream errorMsg;                                                           \
-            const char* error = CUDART_INSTANCE.cudaGetErrorString(cudaStatus);                    \
-            errorMsg << "\nfailed with error " << (error ? error : "Unknown error") << '\n'        \
-                     << "File: " << __FILE__ << '\n'                                               \
-                     << "Line: " << static_cast<int>(__LINE__) << '\n';                            \
-            throw std::runtime_error(errorMsg.str());                                              \
-        }                                                                                          \
-    } while (0)
 
 // Define a template to dynamically load symbols
 template <typename FuncType> FuncType load(void* handle, const char* functionName) {
@@ -418,7 +370,7 @@ class CUDART {
         return instance;
     }
 
-    bool loaded() { return cudartHandle != nullptr; }
+    static bool loaded() { return instance().cudartHandle != nullptr; }
 
     using cudaGetDeviceCount_t = cudaError_t (*)(int*);
     using cudaGetDevice_t = cudaError_t (*)(int*);
@@ -556,7 +508,7 @@ class CUDADriver {
         return instance;
     }
 
-    bool loaded() { return cudaHandle != nullptr; }
+    static bool loaded() { return instance().cudaHandle != nullptr; }
 
     using cuInit_t = CUresult (*)(unsigned int);
     using cuDeviceGetCount_t = CUresult (*)(int*);
@@ -690,7 +642,7 @@ class NVRTC {
         return instance;
     }
 
-    bool loaded() { return nvrtcHandle != nullptr; }
+    static bool loaded() { return instance().nvrtcHandle != nullptr; }
 
     using nvrtcCreateProgram_t =
         nvrtcResult (*)(nvrtcProgram*, const char*, const char*, int, const char*[], const char*[]);
@@ -796,15 +748,58 @@ class NVRTC {
     void* nvrtcHandle = nullptr;
 };
 
-#define CUDART_INSTANCE CUDART::instance()
-#define CUDA_DRIVER_INSTANCE CUDADriver::instance()
-#define NVRTC_INSTANCE NVRTC::instance()
+namespace details {
 
-// Convenience macros for cleaner API - hides the global instance from users
-// Usage: GPULITE_CUDART_CALL(cudaMalloc(&ptr, size))
-//        GPULITE_DRIVER_CALL(cuCtxGetCurrent(&ctx))
-#define GPULITE_CUDART_CALL(func) CUDART_SAFE_CALL(CUDART_INSTANCE.func)
-#define GPULITE_DRIVER_CALL(func) CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.func)
+template <typename Res, typename ErrFuncType>
+auto checkCall(Res status, Res sucess, ErrFuncType errFunc, const char* file, int line, const char* call) {
+    if (status != sucess) {
+        auto errorString = errFunc(status);
+        auto functionCall = std::string(call);
+        throw std::runtime_error(
+            functionCall + ": failed with error " + errorString +
+            " (error code " + std::to_string(status) + ") at " +
+            file + ':' + std::to_string(line)
+        );
+    }
+}
+
+inline const char* cudaDriverErrorString(cudaError_t error) {
+    if (CUDADriver::instance().loaded()) {
+        const char* errorStr = nullptr;
+        CUDADriver::instance().cuGetErrorName(error, &errorStr);
+        return errorStr ? errorStr : "Unknown CUDA driver error";
+    }
+    return "CUDA driver library not loaded";
+}
+
+inline const char* cudartErrorString(CUresult error) {
+    if (CUDART::instance().loaded()) {
+        const char* errorStr = CUDART::instance().cudaGetErrorString(error);
+        return errorStr ? errorStr : "Unknown CUDA runtime error";
+    }
+    return "CUDA runtime library not loaded";
+}
+
+inline const char* nvrtcErrorString(nvrtcResult error) {
+    if (NVRTC::instance().loaded()) {
+        const char* errorStr = NVRTC::instance().nvrtcGetErrorString(error);
+        return errorStr ? errorStr : "Unknown NVRTC error";
+    }
+    return "NVRTC library not loaded";
+}
+
+} // namespace details
+
+
+#define GPULITE_CUDA_DRIVER_CALL(func) \
+    details::checkCall(CUDADriver::instance().func, CUDA_SUCCESS, details::cudaDriverErrorString, __FILE__, __LINE__, #func)
+
+#define GPULITE_CUDART_CALL(func) \
+    details::checkCall(CUDART::instance().func, cudaSuccess, details::cudartErrorString, __FILE__, __LINE__, #func)
+
+#define GPULITE_NVRTC_CALL(func) \
+    details::checkCall(NVRTC::instance().func, NVRTC_SUCCESS, details::nvrtcErrorString, __FILE__, __LINE__, #func)
+
 
 // =============================================================================
 // CUDA Kernel Cache Manager - Runtime compilation and caching system
@@ -866,11 +861,9 @@ inline std::string load_cuda_source(const std::string& filename) {
     return ss.str();
 }
 
-/*
-Container class for the cached kernels. Provides functionality for launching compiled kernels as
-well as automatically resizing dynamic shared memory allocations, when needed. Kernels are compiled
-on first launch.
-*/
+/// Container class for the cached kernels. Provides functionality for launching
+/// compiled kernels as well as automatically resizing dynamic shared memory
+/// allocations, when needed. Kernels are compiled on first launch.
 class CachedKernel {
 
   public:
@@ -895,18 +888,17 @@ class CachedKernel {
     CachedKernel& operator=(const CachedKernel&) = default;
 
     inline void setFuncAttribute(CUfunction_attribute attribute, int value) const {
-        CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuFuncSetAttribute(function, attribute, value));
+        GPULITE_CUDA_DRIVER_CALL(cuFuncSetAttribute(function, attribute, value));
     }
 
     int getFuncAttribute(CUfunction_attribute attribute) const {
         int value;
-        CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuFuncGetAttribute(&value, attribute, function));
+        GPULITE_CUDA_DRIVER_CALL(cuFuncGetAttribute(&value, attribute, function));
         return value;
     }
 
-    /*
-    launches the kernel, and optionally synchronizes until control can be passed back to host.
-    */
+    /// Launch the kernel, and optionally synchronizes until control can be
+    /// passed back to host.
     void launch(
         dim3 grid,
         dim3 block,
@@ -922,21 +914,21 @@ class CachedKernel {
 
         CUcontext currentContext = nullptr;
         // Get current context
-        CUresult result = CUDA_DRIVER_INSTANCE.cuCtxGetCurrent(&currentContext);
+        CUresult result = CUDADriver::instance().cuCtxGetCurrent(&currentContext);
 
         if (result != CUDA_SUCCESS || !currentContext) {
             throw std::runtime_error("CachedKernel::launch error getting current context.");
         }
 
         if (currentContext != context) {
-            CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuCtxSetCurrent(context));
+            GPULITE_CUDA_DRIVER_CALL(cuCtxSetCurrent(context));
         }
 
         this->checkAndAdjustSharedMem(shared_mem_size);
 
         CUstream cstream = reinterpret_cast<CUstream>(cuda_stream);
 
-        CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuLaunchKernel(
+        GPULITE_CUDA_DRIVER_CALL(cuLaunchKernel(
             function,
             grid.x,
             grid.y,
@@ -951,39 +943,37 @@ class CachedKernel {
         ));
 
         if (synchronize) {
-            CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuCtxSynchronize());
+            GPULITE_CUDA_DRIVER_CALL(cuCtxSynchronize());
         }
 
         if (currentContext != context) {
-            CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuCtxSetCurrent(currentContext));
+            GPULITE_CUDA_DRIVER_CALL(cuCtxSetCurrent(currentContext));
         }
     }
 
   private:
-    /*
-    The default shared memory space on most recent NVIDIA cards is defaulted
-    49152 bytes. This method
-    attempts to adjust the shared memory to fit the requested configuration if
-    the kernel launch parameters exceeds the default 49152 bytes.
-    */
+    /// The default shared memory space on most recent NVIDIA cards is 49152
+    /// bytes. This method attempts to adjust the shared memory to fit the
+    /// requested configuration if the kernel launch parameters exceeds the
+    /// default 49152 bytes.
     void checkAndAdjustSharedMem(int query_shared_mem_size) {
         if (current_smem_size == 0) {
             CUdevice cuDevice;
-            CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuCtxGetDevice(&cuDevice));
+            GPULITE_CUDA_DRIVER_CALL(cuCtxGetDevice(&cuDevice));
 
-            CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuDeviceGetAttribute(
+            GPULITE_CUDA_DRIVER_CALL(cuDeviceGetAttribute(
                 &max_smem_size_optin, CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN, cuDevice
             ));
 
             int reserved_smem_per_block = 0;
 
-            CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuDeviceGetAttribute(
+            GPULITE_CUDA_DRIVER_CALL(cuDeviceGetAttribute(
                 &reserved_smem_per_block, CU_DEVICE_ATTRIBUTE_RESERVED_SHARED_MEMORY_PER_BLOCK, cuDevice
             ));
 
             int curr_max_smem_per_block = 0;
 
-            CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuDeviceGetAttribute(
+            GPULITE_CUDA_DRIVER_CALL(cuDeviceGetAttribute(
                 &curr_max_smem_per_block, CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK, cuDevice
             ));
 
@@ -997,7 +987,7 @@ class CachedKernel {
                     "CachedKernel::launch requested more smem than available on card."
                 );
             } else {
-                CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuFuncSetAttribute(
+                GPULITE_CUDA_DRIVER_CALL(cuFuncSetAttribute(
                     function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, query_shared_mem_size
                 ));
                 current_smem_size = query_shared_mem_size;
@@ -1005,14 +995,12 @@ class CachedKernel {
         }
     }
 
-    /*
-        Compiles the kernel "kernel_name" located in source file "kernel_code", which additional
-        parameters "options" passed to NVRTC_INSTANCE. Will auto-detect the compute capability of
-       the available card. args for the launch need to be queried as we need to grab the CUcontext
-       in which these ptrs exist.
-        */
+    /// Compiles the kernel "kernel_name" located in source file "kernel_code",
+    /// which additional parameters "options" passed to the NVRTC instance. Will
+    /// auto-detect the compute capability of the available card. args for the
+    /// launch need to be queried as we need to grab the CUcontext in which
+    /// these ptrs exist.
     void compileKernel(std::vector<void*>& kernel_args) {
-
         this->initCudaDriver();
 
         CUcontext currentContext = nullptr;
@@ -1021,12 +1009,12 @@ class CachedKernel {
             unsigned int memtype = 0;
             CUdeviceptr device_ptr = *reinterpret_cast<CUdeviceptr*>(kernel_args[ptr_id]);
 
-            CUresult res = CUDA_DRIVER_INSTANCE.cuPointerGetAttribute(
+            CUresult res = CUDADriver::instance().cuPointerGetAttribute(
                 &memtype, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, device_ptr
             );
 
             if (res == CUDA_SUCCESS && memtype == CU_MEMORYTYPE_DEVICE) {
-                CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuPointerGetAttribute(
+                GPULITE_CUDA_DRIVER_CALL(cuPointerGetAttribute(
                     &currentContext, CU_POINTER_ATTRIBUTE_CONTEXT, device_ptr
                 ));
 
@@ -1037,14 +1025,14 @@ class CachedKernel {
         }
 
         CUcontext query = nullptr;
-        CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuCtxGetCurrent(&query));
+        GPULITE_CUDA_DRIVER_CALL(cuCtxGetCurrent(&query));
 
         if (query != currentContext) {
-            CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuCtxSetCurrent(currentContext));
+            GPULITE_CUDA_DRIVER_CALL(cuCtxSetCurrent(currentContext));
         }
 
         CUdevice cuDevice;
-        CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuCtxGetDevice(&cuDevice));
+        GPULITE_CUDA_DRIVER_CALL(cuCtxGetDevice(&cuDevice));
 
         // Check if debug option is enabled
         const bool enableDebug = std::any_of(
@@ -1077,11 +1065,11 @@ class CachedKernel {
 
         nvrtcProgram prog;
 
-        NVRTC_SAFE_CALL(NVRTC_INSTANCE.nvrtcCreateProgram(
+        GPULITE_NVRTC_CALL(nvrtcCreateProgram(
             &prog, this->kernel_code.c_str(), effective_source_name.c_str(), 0, nullptr, nullptr
         ));
 
-        NVRTC_SAFE_CALL(NVRTC_INSTANCE.nvrtcAddNameExpression(prog, this->kernel_name.c_str()));
+        GPULITE_NVRTC_CALL(nvrtcAddNameExpression(prog, this->kernel_name.c_str()));
 
         std::vector<const char*> c_options;
         c_options.reserve(this->options.size());
@@ -1091,10 +1079,10 @@ class CachedKernel {
 
         int major = 0;
         int minor = 0;
-        CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuDeviceGetAttribute(
+        GPULITE_CUDA_DRIVER_CALL(cuDeviceGetAttribute(
             &major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, cuDevice
         ));
-        CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuDeviceGetAttribute(
+        GPULITE_CUDA_DRIVER_CALL(cuDeviceGetAttribute(
             &minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, cuDevice
         ));
         int arch = major * 10 + minor;
@@ -1102,13 +1090,12 @@ class CachedKernel {
 
         c_options.push_back(smbuf.c_str());
 
-        nvrtcResult compileResult =
-            NVRTC_INSTANCE.nvrtcCompileProgram(prog, c_options.size(), c_options.data());
+        nvrtcResult compileResult = NVRTC::instance().nvrtcCompileProgram(prog, c_options.size(), c_options.data());
         if (compileResult != NVRTC_SUCCESS) {
             size_t logSize;
-            NVRTC_SAFE_CALL(NVRTC_INSTANCE.nvrtcGetProgramLogSize(prog, &logSize));
+            GPULITE_NVRTC_CALL(nvrtcGetProgramLogSize(prog, &logSize));
             std::string log(logSize, '\0');
-            NVRTC_SAFE_CALL(NVRTC_INSTANCE.nvrtcGetProgramLog(prog, &log[0]));
+            GPULITE_NVRTC_CALL(nvrtcGetProgramLog(prog, &log[0]));
             throw std::runtime_error(
                 "KernelFactory::compileAndCacheKernel: Failed to compile CUDA program:\n" + log
             );
@@ -1116,9 +1103,9 @@ class CachedKernel {
 
         // fetch CUBIN
         size_t cubinSize = 0;
-        NVRTC_SAFE_CALL(NVRTC_INSTANCE.nvrtcGetCUBINSize(prog, &cubinSize));
+        GPULITE_NVRTC_CALL(nvrtcGetCUBINSize(prog, &cubinSize));
         std::vector<char> cubin(cubinSize);
-        NVRTC_SAFE_CALL(NVRTC_INSTANCE.nvrtcGetCUBIN(prog, cubin.data()));
+        GPULITE_NVRTC_CALL(nvrtcGetCUBIN(prog, cubin.data()));
 
         // load the module from cubin
         CUmodule module = nullptr;
@@ -1130,13 +1117,13 @@ class CachedKernel {
             opts[0] = CU_JIT_GENERATE_DEBUG_INFO;
             void** vals = new void*[1];
             vals[0] = (void*)(size_t)1;
-            cuResult = CUDA_DRIVER_INSTANCE.cuModuleLoadDataEx(
+            cuResult = CUDADriver::instance().cuModuleLoadDataEx(
                 &module, cubin.data(), 1, opts, vals
             );
             delete[] vals;
         } else {
             // Load without JIT options
-            cuResult = CUDA_DRIVER_INSTANCE.cuModuleLoadDataEx(
+            cuResult = CUDADriver::instance().cuModuleLoadDataEx(
                 &module, cubin.data(), 0, 0, 0
             );
         }
@@ -1151,28 +1138,25 @@ class CachedKernel {
         }
 
         const char* lowered_name;
-        NVRTC_SAFE_CALL(
-            NVRTC_INSTANCE.nvrtcGetLoweredName(prog, this->kernel_name.c_str(), &lowered_name)
-        );
+        GPULITE_NVRTC_CALL(nvrtcGetLoweredName(prog, this->kernel_name.c_str(), &lowered_name));
         CUfunction kernel;
-        CUDADRIVER_SAFE_CALL(CUDA_DRIVER_INSTANCE.cuModuleGetFunction(&kernel, module, lowered_name));
+        GPULITE_CUDA_DRIVER_CALL(cuModuleGetFunction(&kernel, module, lowered_name));
 
         this->module = module;
         this->function = kernel;
         this->context = currentContext;
         this->compiled = true;
 
-        NVRTC_SAFE_CALL(NVRTC_INSTANCE.nvrtcDestroyProgram(&prog));
+        GPULITE_NVRTC_CALL(nvrtcDestroyProgram(&prog));
     }
 
     void initCudaDriver() {
-
         int deviceCount = 0;
         // Check if CUDA has already been initialized
-        CUresult res = CUDA_DRIVER_INSTANCE.cuDeviceGetCount(&deviceCount);
+        CUresult res = CUDADriver::instance().cuDeviceGetCount(&deviceCount);
         if (res == CUDA_ERROR_NOT_INITIALIZED) {
             // CUDA hasn't been initialized, so we initialize it now
-            res = CUDA_DRIVER_INSTANCE.cuInit(0);
+            res = CUDADriver::instance().cuInit(0);
             if (res != CUDA_SUCCESS) {
                 throw std::runtime_error(
                     "KernelFactory::initCudaDriver: Failed to initialize CUDA CUDA_DRIVER_INSTANCE."
@@ -1195,10 +1179,10 @@ class CachedKernel {
     std::vector<std::string> options;
 };
 
-/*
-Factory class to create and store compiled cuda kernels for caching as a simple name-based hashmap.
-Allows both compiling from a source file, or for compiling from a variable containing CUDA code.
-*/
+
+/// Factory class to create and store compiled cuda kernels for caching as a
+/// simple name-based hashmap. Allows both compiling from a source file, or for
+/// compiling from a variable containing CUDA code.
 class KernelFactory {
   public:
     KernelFactory(const KernelFactory&) = delete;
@@ -1207,8 +1191,8 @@ class KernelFactory {
     KernelFactory(KernelFactory&&) = default;
     KernelFactory& operator=(KernelFactory&&) = default;
 
-    // Get the singleton instance of the KernelFactory for a given CUDA device.
-    // This ensures that each CUDA device has its own kernel cache.
+    /// Get the singleton instance of the KernelFactory for a given CUDA device.
+    /// This ensures that each CUDA device has its own kernel cache.
     static KernelFactory& instance(CUdevice device) {
         static std::list<KernelFactory> INSTANCES;
         for (size_t i = INSTANCES.size(); i < device + 1; i++) {
@@ -1247,9 +1231,8 @@ class KernelFactory {
         }
     }
 
-    /*
-    Tries to retrieve the kernel "kernel_name". If not found, instantiate it and save to cache.
-    */
+    /// Tries to retrieve the kernel "kernel_name". If not found, instantiate it
+    /// and save to cache.
     CachedKernel* createFromSource(
         const std::string& kernel_name,
         const std::string& source_path,
@@ -1263,9 +1246,8 @@ class KernelFactory {
         return this->getKernel(kernel_name);
     }
 
-    /*
-    Tries to retrieve the kernel "kernel_name". If not found, instantiate it and save to cache.
-    */
+    /// Tries to retrieve the kernel "kernel_name". If not found, instantiate it
+    /// and save to cache.
     CachedKernel* create(
         const std::string& kernel_name,
         const std::string& source_variable,
