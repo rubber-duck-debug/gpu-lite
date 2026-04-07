@@ -124,7 +124,7 @@ extern "C" __global__ void matrix_multiply(float* A, float* B, float* C, int N) 
         CUDART_SAFE_CALL(CUDART_INSTANCE.cudaMemcpy(d_b, h_b.data(), size, cudaMemcpyHostToDevice));
 
         // Create and cache kernel
-        auto& factory = KernelFactory::instance();
+        auto& factory = KernelFactory::instance(CUdevice(0));
         std::cout << "Compiling kernel..." << std::endl;
 
         auto compile_start = std::chrono::high_resolution_clock::now();

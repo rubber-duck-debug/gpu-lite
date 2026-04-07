@@ -78,7 +78,7 @@ extern "C" __global__ void process_array_)" + type_name + R"(()" +
         std::string kernel_name = "process_array_" + type_name;
 
         // Create and cache kernel
-        auto& factory = KernelFactory::instance();
+        auto& factory = KernelFactory::instance(CUdevice(0));
         std::cout << "Compiling " << type_name << " kernel: " << kernel_name << std::endl;
 
         auto compile_start = std::chrono::high_resolution_clock::now();

@@ -64,7 +64,7 @@ int main() {
         GPULITE_CUDART_CALL(cudaStreamCreate(&streams[1]));
 
         // Compile kernel
-        auto& factory = KernelFactory::instance();
+        auto& factory = KernelFactory::instance(CUdevice(0));
         std::cout << "\nCompiling kernel..." << std::endl;
         auto* kernel = factory.create(
             "scale_array",
