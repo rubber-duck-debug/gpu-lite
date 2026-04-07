@@ -26,7 +26,7 @@ int main() {
 
     try {
         // Check CUDA availability
-        if (!CUDA_DRIVER_INSTANCE.loaded() || !NVRTC_INSTANCE.loaded() || !CUDART_INSTANCE.loaded()) {
+        if (!CUDADriver::loaded() || !NVRTC::loaded() || !CUDART::loaded()) {
             std::cerr << "Error: CUDA runtime libraries not available" << std::endl;
             return 1;
         }
