@@ -3,6 +3,40 @@
 #ifndef GPULITE_HPP
 #define GPULITE_HPP
 
+#include <cstddef>
+
+#include <list>
+#include <mutex>
+#include <memory>
+#include <string>
+#include <vector>
+#include <fstream>
+#include <sstream>
+#include <typeinfo>
+#include <algorithm>
+#include <stdexcept>
+#include <unordered_map>
+
+
+#if defined(__linux__) || defined(__APPLE__)
+#include <dlfcn.h>
+#include <unistd.h>  // for getcwd
+#elif defined(_WIN32)
+#include <windows.h>
+#include <libloaderapi.h>
+
+#include <direct.h>  // for _getcwd
+#define getcwd _getcwd
+
+#include <filesystem>
+#else
+#error "Platform not supported"
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+#include <cxxabi.h>
+#endif
+
 #if defined(_MSC_VER)
   // MSVC historically reports __cplusplus wrong unless /Zc:__cplusplus is enabled,
   // so prefer _MSVC_LANG there.
@@ -18,8 +52,6 @@
 // =============================================================================
 // CUDA Types Wrapper - Minimal CUDA type definitions for build-time independence
 // =============================================================================
-
-#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -140,29 +172,6 @@ typedef enum CUjit_option_enum {
 // Dynamic CUDA - Dynamic loading of CUDA runtime libraries
 // =============================================================================
 
-#if defined(__linux__) || defined(__APPLE__)
-#include <dlfcn.h>
-#include <unistd.h>  // for getcwd
-#elif defined(_WIN32)
-#include <windows.h>
-#include <libloaderapi.h>
-
-#include <direct.h>  // for _getcwd
-#define getcwd _getcwd
-
-#include <filesystem>
-#else
-#error "Platform not supported"
-#endif
-
-#include <algorithm>
-#include <stdexcept>
-#include <mutex>
-#include <string>
-#include <unordered_map>
-#include <sstream>
-#include <list>
-#include <vector>
 
 #define NVRTC_SAFE_CALL(x)                                                                         \
     do {                                                                                           \
@@ -800,16 +809,6 @@ class NVRTC {
 // =============================================================================
 // CUDA Kernel Cache Manager - Runtime compilation and caching system
 // =============================================================================
-
-#include <fstream>
-#include <vector>
-#include <unordered_map>
-#include <memory>
-#include <typeinfo>
-
-#if defined(__GNUC__) || defined(__clang__)
-#include <cxxabi.h>
-#endif
 
 // Helper function to demangle the type name if necessary
 inline std::string demangleTypeName(const std::string& name) {
