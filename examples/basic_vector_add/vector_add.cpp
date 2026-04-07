@@ -58,7 +58,7 @@ extern "C" __global__ void vector_add(float* a, float* b, float* c, int n) {
         GPULITE_CUDART_CALL(cudaMemcpy(d_b, h_b.data(), size, cudaMemcpyHostToDevice));
 
         // Create and cache kernel
-        auto& factory = KernelFactory::instance();
+        auto& factory = KernelFactory::instance(CUdevice(0));
         std::cout << "Compiling kernel..." << std::endl;
 
         auto start = std::chrono::high_resolution_clock::now();
