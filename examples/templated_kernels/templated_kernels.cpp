@@ -11,9 +11,7 @@
 #include <numeric>
 
 template<typename T>
-void run_templated_example(const std::string& type_name) {
-    std::cout << "\n=== " << type_name << " Template Example ===" << std::endl;
-
+void run_templated_example() {
     const int N = 1024 * 256;
     const size_t size = N * sizeof(T);
 
@@ -46,21 +44,13 @@ __device__ T cube(T x) {
     return x * x * x;
 }
 
-extern "C" __global__ void process_array_)" + type_name + R"(()" +
-    (std::is_same_v<T, float> ? "float" :
-     std::is_same_v<T, double> ? "double" :
-     std::is_same_v<T, int> ? "int" : "long long") +
-    R"(* input, )" +
-    (std::is_same_v<T, float> ? "float" :
-     std::is_same_v<T, double> ? "double" :
-     std::is_same_v<T, int> ? "int" : "long long") +
-    R"(* output, int n) {
+template<typename T>
+__global__ void process_array(T* input, T* output, int n) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n) {
         auto val = input[idx];
         // Apply some mathematical operations
-        output[idx] = square(val) + cube(val) / (val + )" +
-        (std::is_integral_v<T> ? "1" : "1.0") + R"();
+        output[idx] = square(val) + cube(val) / (val + 1);
     }
 }
 )";
@@ -75,11 +65,11 @@ extern "C" __global__ void process_array_)" + type_name + R"(()" +
         GPULITE_CUDART_CALL(cudaMemcpy(d_input, h_input.data(), size, cudaMemcpyHostToDevice));
 
         // Create templated kernel name using the helper function
-        std::string kernel_name = "process_array_" + type_name;
+        std::string kernel_name = gpulite::getTemplateKernelName<T>("process_array");
 
         // Create and cache kernel
         auto& factory = gpulite::KernelFactory::instance(CUdevice(0));
-        std::cout << "Compiling " << type_name << " kernel: " << kernel_name << std::endl;
+        std::cout << "Compiling kernel: " << kernel_name << std::endl;
 
         auto compile_start = std::chrono::high_resolution_clock::now();
         auto* kernel = factory.create(
@@ -172,7 +162,7 @@ extern "C" __global__ void process_array_)" + type_name + R"(()" +
         }
 
         if (success) {
-            std::cout << "SUCCESS: " << type_name << " templated kernel executed correctly!" << std::endl;
+            std::cout << "SUCCESS: templated kernel executed correctly!" << std::endl;
 
             // Performance metrics using different time estimates
             double bandwidth_avg = (2.0 * N * sizeof(T)) / (avg_time * 1e-6) / 1e9;
@@ -181,7 +171,7 @@ extern "C" __global__ void process_array_)" + type_name + R"(()" +
                       << bandwidth_avg << " GB/s" << std::endl;
             std::cout << "Memory bandwidth (peak): " << bandwidth_peak << " GB/s" << std::endl;
         } else {
-            std::cout << "FAILURE: " << type_name << " templated kernel produced incorrect results." << std::endl;
+            std::cout << "FAILURE: templated kernel produced incorrect results." << std::endl;
         }
 
         // Clean up
@@ -189,7 +179,7 @@ extern "C" __global__ void process_array_)" + type_name + R"(()" +
         GPULITE_CUDART_CALL(cudaFree(d_output));
 
     } catch (const std::exception& e) {
-        std::cerr << "Error in " << type_name << " example: " << e.what() << std::endl;
+        std::cerr << "Error in example: " << e.what() << std::endl;
     }
 }
 
@@ -206,9 +196,9 @@ int main() {
         std::cout << "for different data types using runtime compilation." << std::endl;
 
         // Run examples with different data types
-        run_templated_example<float>("float");
-        run_templated_example<double>("double");
-        run_templated_example<int>("int");
+        run_templated_example<float>();
+        run_templated_example<double>();
+        run_templated_example<int>();
 
         std::cout << "\n=== Advanced Template Example ===" << std::endl;
 

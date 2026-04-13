@@ -44,6 +44,10 @@
   #endif
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+#include <cxxabi.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -455,7 +459,56 @@ inline std::optional<std::filesystem::path> FindBestCudaDll(const std::wstring& 
 
 #endif
 
+// Helper function to demangle the type name if necessary
+inline std::string demangleTypeName(const std::string& name) {
+#if defined(__GNUC__) || defined(__clang__)
+    int status = 0;
+    std::unique_ptr<char, void (*)(void*)> demangled_name(
+        abi::__cxa_demangle(name.c_str(), 0, 0, &status), std::free
+    );
+    return (status == 0) ? demangled_name.get() : name;
+#else
+    // not ideal, but better than nothing on other compilers
+    return name;
+#endif
+}
+
+// Function to get type name of a single type
+template <typename T> std::string typeName() {
+    return demangleTypeName(typeid(T).name());
+}
+
+// Variadic template function to build type list
+template <typename T, typename... Ts> void buildTemplateTypes(std::string& base) {
+    base += typeName<T>(); // Add the first type
+    // If there are more types, add a comma and recursively call for the remaining types
+    if constexpr (sizeof...(Ts) > 0) {
+        base += ", ";
+        buildTemplateTypes<Ts...>(base); // Recursively call for the rest of the types
+    }
+}
+
+// Helper function to start building the types
+template <typename T, typename... Ts> std::string buildTemplateTypes() {
+    std::string result;
+    buildTemplateTypes<T, Ts...>(result); // Use recursive variadic template
+    return result;
+}
+
 } // namespace details
+
+// Base case: No template arguments, return function name without any type information
+inline std::string getTemplateKernelName(const std::string& fn_name) {
+    return fn_name;
+}
+
+/*
+Function to get the kernel name with the list of templated types if any:
+*/
+template <typename T, typename... Ts> std::string getTemplateKernelName(const std::string& fn_name) {
+    std::string type_list = details::buildTemplateTypes<T, Ts...>(); // Build type list
+    return fn_name + "<" + type_list + ">"; // Return function name with type list in angle brackets
+}
 
 /*
 This class allows us to dynamically load the CUDA runtime and reference the functions contained
