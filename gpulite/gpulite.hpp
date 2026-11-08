@@ -730,6 +730,7 @@ class CUDART {
     using cudaFreeHost_t = cudaError_t (*)(void*);
     using cudaHostGetDevicePointer_t = cudaError_t (*)(void**, void*, unsigned int);
     using cudaMemcpyAsync_t = cudaError_t (*)(void*, const void*, size_t, cudaMemcpyKind, cudaStream_t);
+    using cudaMemsetAsync_t = cudaError_t (*)(void*, int, size_t, cudaStream_t);
 
     cudaGetDeviceCount_t cudaGetDeviceCount;
     cudaGetDevice_t cudaGetDevice;
@@ -750,6 +751,7 @@ class CUDART {
     cudaFreeHost_t cudaFreeHost;
     cudaHostGetDevicePointer_t cudaHostGetDevicePointer;
     cudaMemcpyAsync_t cudaMemcpyAsync;
+    cudaMemsetAsync_t cudaMemsetAsync;
 
     CUDART() {
 #if defined(__linux__) || defined(__APPLE__)
@@ -827,6 +829,7 @@ class CUDART {
             cudaFreeHost = details::loadSymbol<cudaFreeHost_t>(cudartHandle, "cudaFreeHost");
             cudaHostGetDevicePointer = details::loadSymbol<cudaHostGetDevicePointer_t>(cudartHandle, "cudaHostGetDevicePointer");
             cudaMemcpyAsync = details::loadSymbol<cudaMemcpyAsync_t>(cudartHandle, "cudaMemcpyAsync");
+            cudaMemsetAsync = details::loadSymbol<cudaMemsetAsync_t>(cudartHandle, "cudaMemsetAsync");
         }
     }
 
